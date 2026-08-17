@@ -1,0 +1,27 @@
+[project]
+name = "gopro-accel-player"
+version = "0.1.0"
+description = "Local web player that plots a GoPro clip's accelerometer on a clickable, zoomable timeline."
+requires-python = ">=3.10"
+dependencies = []
+
+[project.optional-dependencies]
+dev = ["pytest>=8.0"]
+
+[project.scripts]
+gopro-accel-player = "gopro_accel.__main__:main"
+
+[build-system]
+requires = ["setuptools>=68"]
+build-backend = "setuptools.build_meta"
+
+[tool.setuptools.packages.find]
+include = ["gopro_accel*"]
+
+[tool.setuptools.package-data]
+gopro_accel = ["static/*"]
+
+[tool.pytest.ini_options]
+markers = [
+    "integration: requires ffmpeg/ffprobe on PATH and sample media",
+]
