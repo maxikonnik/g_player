@@ -1,5 +1,9 @@
 * { box-sizing: border-box; }
-body { font-family: system-ui, sans-serif; margin: 16px; max-width: 900px; }
+html, body { height: 100%; }
+body { font-family: system-ui, sans-serif; margin: 16px; max-width: 900px;
+  display: flex; flex-direction: column; height: calc(100vh - 32px); }
+.bar, #stage { flex: 0 0 auto; }
+#graphs { flex: 1 1 auto; overflow-y: auto; min-height: 0; }
 .bar { display: flex; align-items: center; gap: 8px; margin-bottom: 10px; }
 .bar select { flex: 1; padding: 6px; }
 #stage { position: relative; background: #000; border-radius: 8px;
