@@ -19,7 +19,7 @@ from gopro_accel.ffprobe import (
     probe_fps,
 )
 from gopro_accel.ffprobe import extract_gpmf_blob
-from gopro_accel.accel import parse_accel
+from gopro_accel.accel import parse_stream
 from gopro_accel.fsbrowse import drive_roots, list_dir, resolve_within
 from gopro_accel.proxy import ensure_h264_proxy
 
@@ -131,13 +131,15 @@ def make_handler(roots: list[str]) -> type:
                 return self._json({"error": "no GPMF stream"}, 422)
             blob = extract_gpmf_blob(safe)
             times = gpmd_packet_times(safe, index)
-            series = parse_accel(blob, times, probe_duration(safe))
-            if not series.t:
+            dur = probe_duration(safe)
+            accel = parse_stream(blob, times, "ACCL", dur)
+            gyro = parse_stream(blob, times, "GYRO", dur)
+            if not accel.t:
                 return self._json({"error": "no ACCL samples"}, 422)
             return self._json({
-                "t": series.t, "ax": series.ax, "ay": series.ay,
-                "az": series.az, "amag": series.amag,
-                "warnings": series.warnings, "fps": probe_fps(safe),
+                "t": accel.t, "ax": accel.x, "ay": accel.y, "az": accel.z, "amag": accel.mag,
+                "gt": gyro.t, "gx": gyro.x, "gy": gyro.y, "gz": gyro.z, "gmag": gyro.mag,
+                "warnings": accel.warnings + gyro.warnings, "fps": probe_fps(safe),
             })
 
         def _video(self, path):

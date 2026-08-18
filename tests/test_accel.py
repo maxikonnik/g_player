@@ -2,6 +2,7 @@ import math
 import struct
 
 from gopro_accel.accel import parse_accel
+from gopro_accel.accel import parse_stream
 
 
 def _klv(key: bytes, type_char: bytes, sample_size: int, repeat: int, payload: bytes) -> bytes:
@@ -44,3 +45,30 @@ def test_parse_accel_packet_mismatch_falls_back_to_uniform():
     series = parse_accel(blob, packet_times=[(0.0, 1.0)], video_duration=4.0)
     assert series.t == [1.0, 3.0]  # centres of two halves of [0, 4]
     assert any("mismatch" in w for w in series.warnings)
+
+
+def _devc_with_stream(key: bytes, scal: int | None, samples: list[tuple[int, int, int]]) -> bytes:
+    children = b""
+    if scal is not None:
+        children += _klv(b"SCAL", b"s", 2, 1, struct.pack(">h", scal))
+    payload = b"".join(struct.pack(">hhh", *s) for s in samples)
+    children += _klv(key, b"s", 6, len(samples), payload)
+    strm = _klv(b"STRM", b"\x00", 1, len(children), children)
+    return _klv(b"DEVC", b"\x00", 1, len(strm), strm)
+
+
+def test_parse_stream_decodes_gyro():
+    blob = _devc_with_stream(b"GYRO", 100, [(100, 0, 0), (0, 200, 0)])
+    s = parse_stream(blob, packet_times=[(10.0, 1.0)], key="GYRO")
+    assert s.t == [10.25, 10.75]
+    assert s.x == [1.0, 0.0]
+    assert s.y == [0.0, 2.0]
+    assert s.mag == [1.0, 2.0]
+    assert s.warnings == []
+
+
+def test_parse_stream_absent_key_is_empty_without_warning():
+    blob = _devc_with_stream(b"ACCL", 1, [(1, 0, 0)])  # ACCL present, GYRO absent
+    s = parse_stream(blob, packet_times=[(0.0, 1.0)], key="GYRO")
+    assert s.t == [] and s.mag == []
+    assert s.warnings == []
