@@ -10,25 +10,38 @@ let mode = "mag";
 let curPath = null;
 let viewStart = 0, viewEnd = 1;   // visible time window (seconds)
 let userZoomed = false;
-const SERIES = {
-  mag: [{ key: "amag", color: "#26215c", label: "|a|", width: 2.4 }],
-  xyz: [
-    { key: "ax", color: "#378ADD", label: "X", width: 1.4 },
-    { key: "ay", color: "#1D9E75", label: "Y", width: 1.4 },
-    { key: "az", color: "#D85A30", label: "Z", width: 1.4 },
-  ],
-};
-const GYRO_SERIES = {
-  mag: [{ key: "gmag", color: "#26215c", label: "|ω|", width: 2.4 }],
-  xyz: [
-    { key: "gx", color: "#378ADD", label: "X", width: 1.4 },
-    { key: "gy", color: "#1D9E75", label: "Y", width: 1.4 },
-    { key: "gz", color: "#D85A30", label: "Z", width: 1.4 },
-  ],
-};
-let gmode = "mag";
-const gcanvas = document.getElementById("scrub2");
-const gctx = gcanvas.getContext("2d");
+const COL = { x: "#378ADD", y: "#1D9E75", z: "#D85A30", w: "#7F77DD", mag: "#26215c" };
+function vecModes(magKey, magLabel, xk, yk, zk) {
+  return {
+    mag: [{ key: magKey, color: COL.mag, label: magLabel, width: 2.4 }],
+    xyz: [
+      { key: xk, color: COL.x, label: "X", width: 1.4 },
+      { key: yk, color: COL.y, label: "Y", width: 1.4 },
+      { key: zk, color: COL.z, label: "Z", width: 1.4 },
+    ],
+  };
+}
+function quat(wk, xk, yk, zk) {
+  return [
+    { key: wk, color: COL.w, label: "W", width: 1.4 },
+    { key: xk, color: COL.x, label: "X", width: 1.4 },
+    { key: yk, color: COL.y, label: "Y", width: 1.4 },
+    { key: zk, color: COL.z, label: "Z", width: 1.4 },
+  ];
+}
+const GRAPHS = [
+  { canvasId: "scrub",  legendId: "legend",  toggleSel: ".mbtn", tKey: "t",   unit: "m/s²",  modes: vecModes("amag", "|a|", "ax", "ay", "az"),    mode: "mag" },
+  { canvasId: "scrub2", legendId: "legend2", toggleSel: ".gbtn", tKey: "gt",  unit: "rad/s", modes: vecModes("gmag", "|ω|", "gx", "gy", "gz"),    mode: "mag" },
+  { canvasId: "scrub3", legendId: "legend3", toggleSel: ".rbtn", tKey: "gvt", unit: "g",     modes: vecModes("gvmag", "|g|", "gvx", "gvy", "gvz"), mode: "xyz" },
+  { canvasId: "scrub4", legendId: "legend4", tKey: "cot", unit: "", fixed: quat("cow", "cox", "coy", "coz") },
+  { canvasId: "scrub5", legendId: "legend5", tKey: "iot", unit: "", fixed: quat("iow", "iox", "ioy", "ioz") },
+];
+for (const g of GRAPHS) {
+  g.cnv = document.getElementById(g.canvasId);
+  g.cx = g.cnv.getContext("2d");
+  g.legendEl = document.getElementById(g.legendId);
+}
+function graphSeries(g) { return g.fixed || g.modes[g.mode]; }
 
 function fmtMs(s) {
   s = Math.max(0, s || 0);
@@ -149,8 +162,9 @@ function drawGraph(cnv, cx, tArr, seriesDef, unit) {
 }
 
 function draw() {
-  drawGraph(canvas, ctx, data && data.t, SERIES[mode], "m/s²");
-  drawGraph(gcanvas, gctx, data && data.gt, GYRO_SERIES[gmode], "rad/s");
+  for (const g of GRAPHS) {
+    drawGraph(g.cnv, g.cx, data && data[g.tKey], graphSeries(g), g.unit);
+  }
   updatePanbar();
 }
 
@@ -185,12 +199,6 @@ function eventTime(e) {
   const frac = Math.max(0, Math.min(1, (e.clientX - r.left) / r.width));
   return viewStart + frac * (viewEnd - viewStart);
 }
-canvas.addEventListener("mousedown", (e) => {
-  activeCanvas = e.currentTarget;
-  if (!data || !data.t.length) return;
-  selecting = true; dragging = false; downX = e.clientX;
-  downTime = eventTime(e); selStartTime = downTime; selCurTime = downTime;
-});
 window.addEventListener("mousemove", (e) => {
   if (!selecting) return;
   if (!(e.buttons & 1)) { selecting = false; dragging = false; return; }
@@ -208,15 +216,15 @@ window.addEventListener("mouseup", () => {
   }
   dragging = false;
 });
-canvas.addEventListener("dblclick", () => { resetView(); });
-
-gcanvas.addEventListener("mousedown", (e) => {
-  activeCanvas = e.currentTarget;
-  if (!data || !data.t.length) return;
-  selecting = true; dragging = false; downX = e.clientX;
-  downTime = eventTime(e); selStartTime = downTime; selCurTime = downTime;
-});
-gcanvas.addEventListener("dblclick", () => { resetView(); });
+for (const g of GRAPHS) {
+  g.cnv.addEventListener("mousedown", (e) => {
+    activeCanvas = e.currentTarget;
+    if (!data || !data.t.length) return;
+    selecting = true; dragging = false; downX = e.clientX;
+    downTime = eventTime(e); selStartTime = downTime; selCurTime = downTime;
+  });
+  g.cnv.addEventListener("dblclick", () => { resetView(); });
+}
 
 function zoomBy(factor) {
   if (!data || !data.t.length) return;
@@ -232,18 +240,6 @@ document.getElementById("zoomin").addEventListener("click", () => zoomBy(1 / 1.5
 document.getElementById("zoomout").addEventListener("click", () => zoomBy(1.5));
 document.getElementById("zoomreset").addEventListener("click", () => resetView());
 
-document.querySelectorAll(".mbtn").forEach((b) => {
-  b.addEventListener("click", () => {
-    mode = b.dataset.m;
-    document.querySelectorAll(".mbtn").forEach((x) => x.classList.remove("on"));
-    b.classList.add("on");
-    renderLegend();
-    draw();
-  });
-});
-
-const legendEl = document.getElementById("legend");
-const legend2El = document.getElementById("legend2");
 function renderLegendInto(el, seriesDef) {
   el.innerHTML = "";
   for (const s of seriesDef) {
@@ -258,20 +254,22 @@ function renderLegendInto(el, seriesDef) {
   }
 }
 function renderLegend() {
-  renderLegendInto(legendEl, SERIES[mode]);
-  renderLegendInto(legend2El, GYRO_SERIES[gmode]);
+  for (const g of GRAPHS) renderLegendInto(g.legendEl, graphSeries(g));
 }
 renderLegend();
 
-document.querySelectorAll(".gbtn").forEach((b) => {
-  b.addEventListener("click", () => {
-    gmode = b.dataset.m;
-    document.querySelectorAll(".gbtn").forEach((x) => x.classList.remove("on"));
-    b.classList.add("on");
-    renderLegend();
-    draw();
+for (const g of GRAPHS) {
+  if (!g.toggleSel) continue;
+  document.querySelectorAll(g.toggleSel).forEach((b) => {
+    b.addEventListener("click", () => {
+      g.mode = b.dataset.m;
+      document.querySelectorAll(g.toggleSel).forEach((x) => x.classList.remove("on"));
+      b.classList.add("on");
+      renderLegend();
+      draw();
+    });
   });
-});
+}
 
 function stepPlayhead(dir) {
   if (!data || !data.t.length) return;
