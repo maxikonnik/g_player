@@ -133,13 +133,24 @@ def make_handler(roots: list[str]) -> type:
             times = gpmd_packet_times(safe, index)
             dur = probe_duration(safe)
             accel = parse_stream(blob, times, "ACCL", dur)
-            gyro = parse_stream(blob, times, "GYRO", dur)
             if not accel.t:
                 return self._json({"error": "no ACCL samples"}, 422)
+            gyro = parse_stream(blob, times, "GYRO", dur)
+            grav = parse_stream(blob, times, "GRAV", dur)
+            cori = parse_stream(blob, times, "CORI", dur)
+            iori = parse_stream(blob, times, "IORI", dur)
+
+            def comp(s, i):
+                return s.comps[i] if i < len(s.comps) else []
+
             return self._json({
-                "t": accel.t, "ax": accel.x, "ay": accel.y, "az": accel.z, "amag": accel.mag,
-                "gt": gyro.t, "gx": gyro.x, "gy": gyro.y, "gz": gyro.z, "gmag": gyro.mag,
-                "warnings": accel.warnings + gyro.warnings, "fps": probe_fps(safe),
+                "t": accel.t, "ax": comp(accel, 0), "ay": comp(accel, 1), "az": comp(accel, 2), "amag": accel.mag,
+                "gt": gyro.t, "gx": comp(gyro, 0), "gy": comp(gyro, 1), "gz": comp(gyro, 2), "gmag": gyro.mag,
+                "gvt": grav.t, "gvx": comp(grav, 0), "gvy": comp(grav, 1), "gvz": comp(grav, 2), "gvmag": grav.mag,
+                "cot": cori.t, "cow": comp(cori, 0), "cox": comp(cori, 1), "coy": comp(cori, 2), "coz": comp(cori, 3),
+                "iot": iori.t, "iow": comp(iori, 0), "iox": comp(iori, 1), "ioy": comp(iori, 2), "ioz": comp(iori, 3),
+                "warnings": accel.warnings + gyro.warnings + grav.warnings + cori.warnings + iori.warnings,
+                "fps": probe_fps(safe),
             })
 
         def _video(self, path):

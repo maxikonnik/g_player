@@ -61,10 +61,25 @@ def test_parse_stream_decodes_gyro():
     blob = _devc_with_stream(b"GYRO", 100, [(100, 0, 0), (0, 200, 0)])
     s = parse_stream(blob, packet_times=[(10.0, 1.0)], key="GYRO")
     assert s.t == [10.25, 10.75]
-    assert s.x == [1.0, 0.0]
-    assert s.y == [0.0, 2.0]
+    assert s.comps[0] == [1.0, 0.0]
+    assert s.comps[1] == [0.0, 2.0]
     assert s.mag == [1.0, 2.0]
     assert s.warnings == []
+
+
+def test_parse_stream_decodes_quaternion():
+    children = _klv(b"SCAL", b"s", 2, 1, struct.pack(">h", 100))
+    samples = [(100, 0, 0, 0), (0, 100, 0, 100)]
+    payload = b"".join(struct.pack(">hhhh", *s) for s in samples)
+    children += _klv(b"CORI", b"s", 8, len(samples), payload)
+    strm = _klv(b"STRM", b"\x00", 1, len(children), children)
+    blob = _klv(b"DEVC", b"\x00", 1, len(strm), strm)
+    s = parse_stream(blob, packet_times=[(0.0, 1.0)], key="CORI")
+    assert len(s.comps) == 4
+    assert s.comps[0] == [1.0, 0.0]
+    assert s.comps[3] == [0.0, 1.0]
+    assert s.mag[0] == 1.0
+    assert abs(s.mag[1] - math.sqrt(2)) < 1e-9
 
 
 def test_parse_stream_absent_key_is_empty_without_warning():
