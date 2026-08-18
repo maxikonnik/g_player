@@ -33,7 +33,6 @@ const GRAPHS = [
   { canvasId: "scrub2", legendId: "legend2", toggleSel: ".gbtn", tKey: "gt",  unit: "rad/s", modes: vecModes("gmag", "|ω|", "gx", "gy", "gz"),    mode: "mag" },
   { canvasId: "scrub3", legendId: "legend3", toggleSel: ".rbtn", tKey: "gvt", unit: "g",     modes: vecModes("gvmag", "|g|", "gvx", "gvy", "gvz"), mode: "xyz" },
   { canvasId: "scrub4", legendId: "legend4", tKey: "cot", unit: "", fixed: quat("cow", "cox", "coy", "coz") },
-  { canvasId: "scrub5", legendId: "legend5", tKey: "iot", unit: "", fixed: quat("iow", "iox", "ioy", "ioz") },
 ];
 for (const g of GRAPHS) {
   g.cnv = document.getElementById(g.canvasId);
@@ -358,20 +357,13 @@ async function browse(path) {
     if (e.is_dir) fslist.appendChild(makeRow("📁", e.name, () => browse(e.path)));
     else fslist.appendChild(makeRow("🎬", e.name, () => {
       modal.classList.add("hidden");
-      addFileOption(e.path, e.name);
-      openFile(e.path);
+      rootDir = body.cwd;
+      populateList(body.cwd, e.path);
     }));
   }
 }
 
-function addFileOption(path, name) {
-  const sel = document.getElementById("filesel");
-  const opt = document.createElement("option");
-  opt.value = path; opt.textContent = name; opt.selected = true;
-  sel.insertBefore(opt, sel.firstChild);
-}
-
-async function populateList(root) {
+async function populateList(root, selectPath) {
   const res = await fetch(`/api/browse?path=${encodeURIComponent(root)}`);
   const body = await res.json();
   const sel = document.getElementById("filesel");
@@ -381,12 +373,27 @@ async function populateList(root) {
     opt.value = e.path; opt.textContent = e.name;
     sel.appendChild(opt);
   }
-  if (sel.value) openFile(sel.value);
+  if (selectPath) {
+    sel.value = selectPath;
+    openFile(selectPath);
+  } else if (sel.value) {
+    openFile(sel.value);
+  }
 }
 
 document.getElementById("filesel").addEventListener("change", (e) => openFile(e.target.value));
 document.getElementById("browse").addEventListener("click", () => {
   modal.classList.remove("hidden"); browse(browseCwd || rootDir);
+});
+document.getElementById("copypath").addEventListener("click", async () => {
+  if (!curPath) return;
+  try {
+    await navigator.clipboard.writeText(curPath);
+  } catch (err) { /* clipboard blocked — still show feedback */ }
+  const btn = document.getElementById("copypath");
+  const original = btn.textContent;
+  btn.textContent = "Скопировано";
+  setTimeout(() => { btn.textContent = original; }, 1200);
 });
 document.getElementById("closem").addEventListener("click", () => modal.classList.add("hidden"));
 document.getElementById("usefolder").addEventListener("click", () => {
