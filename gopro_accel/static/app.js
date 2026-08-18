@@ -18,6 +18,17 @@ const SERIES = {
     { key: "az", color: "#D85A30", label: "Z", width: 1.4 },
   ],
 };
+const GYRO_SERIES = {
+  mag: [{ key: "gmag", color: "#26215c", label: "|ω|", width: 2.4 }],
+  xyz: [
+    { key: "gx", color: "#378ADD", label: "X", width: 1.4 },
+    { key: "gy", color: "#1D9E75", label: "Y", width: 1.4 },
+    { key: "gz", color: "#D85A30", label: "Z", width: 1.4 },
+  ],
+};
+let gmode = "mag";
+const gcanvas = document.getElementById("scrub2");
+const gctx = gcanvas.getContext("2d");
 
 function fmtMs(s) {
   s = Math.max(0, s || 0);
@@ -69,76 +80,77 @@ function updatePanbar() {
   panthumb.style.width = Math.max(2, (viewEnd - viewStart) / D * 100) + "%";
 }
 
-function draw() {
-  const w = canvas.width = canvas.clientWidth * 2;
-  const h = canvas.height;
-  ctx.clearRect(0, 0, w, h);
-  if (!data || !data.t.length) return;
+function drawGraph(cnv, cx, tArr, seriesDef, unit) {
+  const w = cnv.width = cnv.clientWidth * 2;
+  const h = cnv.height;
+  cx.clearRect(0, 0, w, h);
+  if (!data || !tArr || !tArr.length) return;
   if (!(viewEnd > viewStart)) resetView();
   const span = viewEnd - viewStart;
-  const series = SERIES[mode].map((s) => [data[s.key], s.color, s.width]);
-  let i0 = lowerBound(data.t, viewStart) - 1; if (i0 < 0) i0 = 0;
-  let i1 = lowerBound(data.t, viewEnd); if (i1 > data.t.length - 1) i1 = data.t.length - 1;
+  const series = seriesDef.map((s) => [data[s.key], s.color, s.width]);
+  let i0 = lowerBound(tArr, viewStart) - 1; if (i0 < 0) i0 = 0;
+  let i1 = lowerBound(tArr, viewEnd); if (i1 > tArr.length - 1) i1 = tArr.length - 1;
   const visible = i1 - i0 + 1;
   let minv = Infinity, maxv = -Infinity;
   for (const [arr] of series) for (let i = i0; i <= i1; i++) { const v = arr[i]; if (v < minv) minv = v; if (v > maxv) maxv = v; }
   const mid = (minv + maxv) / 2, half = Math.max((maxv - minv) / 2, 0.5);
-  const lo = mid - half * 1.15, hi = mid + half * 1.15;   // fit Y to the visible range, centred, with headroom
+  const lo = mid - half * 1.15, hi = mid + half * 1.15;
   const pad = 8;
   const X = (t) => (t - viewStart) / span * w;
   const Y = (v) => h - pad - ((v - lo) / (hi - lo)) * (h - 2 * pad);
-  // Y-axis scale: faint gridlines + m/s^2 value labels, behind the trace
-  ctx.font = "22px system-ui, sans-serif";
+  cx.font = "22px system-ui, sans-serif";
   for (const tv of niceTicks(lo, hi, 4)) {
     const gy = Y(tv);
-    ctx.strokeStyle = "rgba(120,120,120,0.25)";
-    ctx.lineWidth = 1;
-    ctx.beginPath(); ctx.moveTo(0, gy); ctx.lineTo(w, gy); ctx.stroke();
-    ctx.fillStyle = "rgba(90,90,90,0.9)";
-    ctx.textBaseline = "bottom";
-    ctx.fillText(tv.toFixed(1), 6, gy - 2);
+    cx.strokeStyle = "rgba(120,120,120,0.25)"; cx.lineWidth = 1;
+    cx.beginPath(); cx.moveTo(0, gy); cx.lineTo(w, gy); cx.stroke();
+    cx.fillStyle = "rgba(90,90,90,0.9)"; cx.textBaseline = "bottom";
+    cx.fillText(tv.toFixed(1), 6, gy - 2);
   }
-  ctx.fillStyle = "rgba(90,90,90,0.9)";
-  ctx.textBaseline = "top";
-  ctx.fillText("m/s²", 6, 4);
+  cx.fillStyle = "rgba(90,90,90,0.9)"; cx.textBaseline = "top";
+  cx.fillText(unit, 6, 4);
   const asDots = visible > 0 && w / visible > 8;
   for (const [arr, color, lw] of series) {
-    ctx.strokeStyle = color; ctx.fillStyle = color; ctx.lineWidth = lw;
+    cx.strokeStyle = color; cx.fillStyle = color; cx.lineWidth = lw;
     if (asDots) {
-      ctx.beginPath();
-      for (let i = i0; i <= i1; i++) { const x = X(data.t[i]), y = Y(arr[i]); i === i0 ? ctx.moveTo(x, y) : ctx.lineTo(x, y); }
-      ctx.stroke();
-      for (let i = i0; i <= i1; i++) { ctx.beginPath(); ctx.arc(X(data.t[i]), Y(arr[i]), 2.5, 0, 6.2832); ctx.fill(); }
+      cx.beginPath();
+      for (let i = i0; i <= i1; i++) { const x = X(tArr[i]), y = Y(arr[i]); i === i0 ? cx.moveTo(x, y) : cx.lineTo(x, y); }
+      cx.stroke();
+      for (let i = i0; i <= i1; i++) { cx.beginPath(); cx.arc(X(tArr[i]), Y(arr[i]), 2.5, 0, 6.2832); cx.fill(); }
     } else {
-      ctx.beginPath();
-      let px = -1, lo = Infinity, hi = -Infinity, started = false;
+      cx.beginPath();
+      let px = -1, lo2 = Infinity, hi2 = -Infinity, started = false;
       for (let i = i0; i <= i1; i++) {
-        const x = Math.floor(X(data.t[i]));
+        const x = Math.floor(X(tArr[i]));
         if (x !== px && px >= 0) {
-          if (!started) { ctx.moveTo(px, Y(hi)); started = true; } else { ctx.lineTo(px, Y(hi)); }
-          ctx.lineTo(px, Y(lo));   // connected columns: single-sample columns stay visible
-          lo = Infinity; hi = -Infinity;
+          if (!started) { cx.moveTo(px, Y(hi2)); started = true; } else { cx.lineTo(px, Y(hi2)); }
+          cx.lineTo(px, Y(lo2));
+          lo2 = Infinity; hi2 = -Infinity;
         }
-        lo = Math.min(lo, arr[i]); hi = Math.max(hi, arr[i]); px = x;
+        lo2 = Math.min(lo2, arr[i]); hi2 = Math.max(hi2, arr[i]); px = x;
       }
       if (px >= 0) {
-        if (!started) ctx.moveTo(px, Y(hi)); else ctx.lineTo(px, Y(hi));
-        ctx.lineTo(px, Y(lo));
+        if (!started) cx.moveTo(px, Y(hi2)); else cx.lineTo(px, Y(hi2));
+        cx.lineTo(px, Y(lo2));
       }
-      ctx.stroke();
+      cx.stroke();
     }
   }
   const t = video.currentTime || 0;
   if (t >= viewStart && t <= viewEnd) {
-    const cx = X(t);
-    ctx.strokeStyle = "#E24B4A"; ctx.lineWidth = 2;
-    ctx.beginPath(); ctx.moveTo(cx, 0); ctx.lineTo(cx, h); ctx.stroke();
+    const px = X(t);
+    cx.strokeStyle = "#E24B4A"; cx.lineWidth = 2;
+    cx.beginPath(); cx.moveTo(px, 0); cx.lineTo(px, h); cx.stroke();
   }
   if (selecting && dragging) {
     const a = X(Math.min(selStartTime, selCurTime)), b = X(Math.max(selStartTime, selCurTime));
-    ctx.fillStyle = "rgba(55,138,221,0.18)";
-    ctx.fillRect(a, 0, b - a, h);
+    cx.fillStyle = "rgba(55,138,221,0.18)";
+    cx.fillRect(a, 0, b - a, h);
   }
+}
+
+function draw() {
+  drawGraph(canvas, ctx, data && data.t, SERIES[mode], "m/s²");
+  drawGraph(gcanvas, gctx, data && data.gt, GYRO_SERIES[gmode], "rad/s");
   updatePanbar();
 }
 
@@ -168,7 +180,7 @@ function loop() {
 const DRAG_PX = 4;
 let selecting = false, dragging = false, downX = 0, downTime = 0, selStartTime = 0, selCurTime = 0;
 function eventTime(e) {
-  const r = canvas.getBoundingClientRect();
+  const r = e.currentTarget.getBoundingClientRect();
   const frac = Math.max(0, Math.min(1, (e.clientX - r.left) / r.width));
   return viewStart + frac * (viewEnd - viewStart);
 }
@@ -196,6 +208,13 @@ window.addEventListener("mouseup", () => {
 });
 canvas.addEventListener("dblclick", () => { resetView(); });
 
+gcanvas.addEventListener("mousedown", (e) => {
+  if (!data || !data.t.length) return;
+  selecting = true; dragging = false; downX = e.clientX;
+  downTime = eventTime(e); selStartTime = downTime; selCurTime = downTime;
+});
+gcanvas.addEventListener("dblclick", () => { resetView(); });
+
 function zoomBy(factor) {
   if (!data || !data.t.length) return;
   const oldSpan = viewEnd - viewStart;
@@ -221,9 +240,10 @@ document.querySelectorAll(".mbtn").forEach((b) => {
 });
 
 const legendEl = document.getElementById("legend");
-function renderLegend() {
-  legendEl.innerHTML = "";
-  for (const s of SERIES[mode]) {
+const legend2El = document.getElementById("legend2");
+function renderLegendInto(el, seriesDef) {
+  el.innerHTML = "";
+  for (const s of seriesDef) {
     const item = document.createElement("span");
     item.className = "legit";
     const sw = document.createElement("span");
@@ -231,10 +251,24 @@ function renderLegend() {
     sw.style.background = s.color;
     item.appendChild(sw);
     item.appendChild(document.createTextNode(s.label));
-    legendEl.appendChild(item);
+    el.appendChild(item);
   }
 }
+function renderLegend() {
+  renderLegendInto(legendEl, SERIES[mode]);
+  renderLegendInto(legend2El, GYRO_SERIES[gmode]);
+}
 renderLegend();
+
+document.querySelectorAll(".gbtn").forEach((b) => {
+  b.addEventListener("click", () => {
+    gmode = b.dataset.m;
+    document.querySelectorAll(".gbtn").forEach((x) => x.classList.remove("on"));
+    b.classList.add("on");
+    renderLegend();
+    draw();
+  });
+});
 
 function stepPlayhead(dir) {
   if (!data || !data.t.length) return;
