@@ -34,6 +34,22 @@ Options:
 - `--port N` — HTTP port (default `8770`).
 - `--no-open` — do not open the browser automatically.
 
+### Windows quick launch
+
+Instead of the command line you can use the bundled scripts (they `cd`
+into the project for you and forward a folder argument):
+
+```bat
+run.bat "D:\GoPro\Jump1"
+```
+
+- Double-click `run.bat` to start with the default root, then pick files
+  with the **Обзор** button.
+- Or drag a folder of `.MP4` files onto `run.bat`.
+- PowerShell users: `.\run.ps1 -Root "D:\GoPro\Jump1" -Port 8090`.
+
+Both need `python` and `ffmpeg`/`ffprobe` on `PATH`.
+
 ## Features
 
 - Accelerometer decoded from GPMF (`ACCL`), aligned to the video's own
