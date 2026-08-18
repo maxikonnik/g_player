@@ -138,7 +138,6 @@ def make_handler(roots: list[str]) -> type:
             gyro = parse_stream(blob, times, "GYRO", dur)
             grav = parse_stream(blob, times, "GRAV", dur)
             cori = parse_stream(blob, times, "CORI", dur)
-            iori = parse_stream(blob, times, "IORI", dur)
 
             def comp(s, i):
                 return s.comps[i] if i < len(s.comps) else []
@@ -148,8 +147,7 @@ def make_handler(roots: list[str]) -> type:
                 "gt": gyro.t, "gx": comp(gyro, 0), "gy": comp(gyro, 1), "gz": comp(gyro, 2), "gmag": gyro.mag,
                 "gvt": grav.t, "gvx": comp(grav, 0), "gvy": comp(grav, 1), "gvz": comp(grav, 2), "gvmag": grav.mag,
                 "cot": cori.t, "cow": comp(cori, 0), "cox": comp(cori, 1), "coy": comp(cori, 2), "coz": comp(cori, 3),
-                "iot": iori.t, "iow": comp(iori, 0), "iox": comp(iori, 1), "ioy": comp(iori, 2), "ioz": comp(iori, 3),
-                "warnings": accel.warnings + gyro.warnings + grav.warnings + cori.warnings + iori.warnings,
+                "warnings": accel.warnings + gyro.warnings + grav.warnings + cori.warnings,
                 "fps": probe_fps(safe),
             })
 
