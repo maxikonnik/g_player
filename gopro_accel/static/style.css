@@ -47,8 +47,8 @@ body { font-family: system-ui, sans-serif; margin: 16px; max-width: 900px;
 .glabel { font-size: 13px; color: #555; }
 .gbtn { padding: 6px 14px; border: 1px solid #bbb; background: #fff; cursor: pointer; }
 .gbtn.on { background: #eee; }
-#scrub3, #scrub4, #scrub5 { width: 100%; height: 120px; margin-top: 12px; background: #f4f4f2;
+#scrub3, #scrub4 { width: 100%; height: 120px; margin-top: 12px; background: #f4f4f2;
   border: 1px solid #ddd; border-radius: 8px; cursor: pointer; display: block; }
-#legend3, #legend4, #legend5 { display: flex; flex-wrap: wrap; gap: 14px; margin-top: 6px; font-size: 12px; color: #555; }
+#legend3, #legend4 { display: flex; flex-wrap: wrap; gap: 14px; margin-top: 6px; font-size: 12px; color: #555; }
 .rbtn { padding: 6px 14px; border: 1px solid #bbb; background: #fff; cursor: pointer; }
 .rbtn.on { background: #eee; }
