@@ -6,7 +6,6 @@ const warnings = document.getElementById("warnings");
 const videomsg = document.getElementById("videomsg");
 
 let data = null;      // {t, ax, ay, az, amag, warnings, fps}
-let mode = "mag";
 let curPath = null;
 let viewStart = 0, viewEnd = 1;   // visible time window (seconds)
 let userZoomed = false;
