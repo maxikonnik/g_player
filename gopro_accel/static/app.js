@@ -179,12 +179,14 @@ function loop() {
 
 const DRAG_PX = 4;
 let selecting = false, dragging = false, downX = 0, downTime = 0, selStartTime = 0, selCurTime = 0;
+let activeCanvas = null;
 function eventTime(e) {
-  const r = e.currentTarget.getBoundingClientRect();
+  const r = (activeCanvas || canvas).getBoundingClientRect();
   const frac = Math.max(0, Math.min(1, (e.clientX - r.left) / r.width));
   return viewStart + frac * (viewEnd - viewStart);
 }
 canvas.addEventListener("mousedown", (e) => {
+  activeCanvas = e.currentTarget;
   if (!data || !data.t.length) return;
   selecting = true; dragging = false; downX = e.clientX;
   downTime = eventTime(e); selStartTime = downTime; selCurTime = downTime;
@@ -209,6 +211,7 @@ window.addEventListener("mouseup", () => {
 canvas.addEventListener("dblclick", () => { resetView(); });
 
 gcanvas.addEventListener("mousedown", (e) => {
+  activeCanvas = e.currentTarget;
   if (!data || !data.t.length) return;
   selecting = true; dragging = false; downX = e.clientX;
   downTime = eventTime(e); selStartTime = downTime; selCurTime = downTime;
