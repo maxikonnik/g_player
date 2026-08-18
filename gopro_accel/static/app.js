@@ -391,9 +391,9 @@ document.getElementById("copypath").addEventListener("click", async () => {
     await navigator.clipboard.writeText(curPath);
   } catch (err) { /* clipboard blocked — still show feedback */ }
   const btn = document.getElementById("copypath");
-  const original = btn.textContent;
+  clearTimeout(btn._restore);
   btn.textContent = "Скопировано";
-  setTimeout(() => { btn.textContent = original; }, 1200);
+  btn._restore = setTimeout(() => { btn.textContent = "Копировать путь"; }, 1200);
 });
 document.getElementById("closem").addEventListener("click", () => modal.classList.add("hidden"));
 document.getElementById("usefolder").addEventListener("click", () => {
