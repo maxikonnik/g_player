@@ -54,7 +54,12 @@ Both need `python` and `ffmpeg`/`ffprobe` on `PATH`.
 
 - Accelerometer decoded from GPMF (`ACCL`), aligned to the video's own
   time base using per-packet ffprobe timing.
-- Magnitude `|a|` or the three axes `X / Y / Z`, with a colour legend.
+- Stacked telemetry graphs on a shared timeline: accelerometer `|a|`,
+  gyroscope, gravity, and camera orientation (quaternion) — each with a
+  `|magnitude|` / `X·Y·Z` toggle and a colour legend.
+- On-frame telemetry overlays (toggleable): the current scene class from
+  `SCEN` and face boxes with smile / blink from `FACE`, drawn over the
+  video in 10 px Calibri in a contrasting colour.
 - Millisecond timecode and a frame counter (`MM:SS.mmm · frame F / total`).
 - Horizontal zoom: `+` / `−` buttons, drag-select a region, double-click to
   reset, a pan scrollbar, and playback auto-follow.
