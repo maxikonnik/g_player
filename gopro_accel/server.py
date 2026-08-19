@@ -20,6 +20,7 @@ from gopro_accel.ffprobe import (
 )
 from gopro_accel.ffprobe import extract_gpmf_blob
 from gopro_accel.accel import parse_stream
+from gopro_accel.overlays import parse_scene, parse_faces
 from gopro_accel.fsbrowse import drive_roots, list_dir, resolve_within
 from gopro_accel.proxy import ensure_h264_proxy
 
@@ -84,6 +85,8 @@ def make_handler(roots: list[str]) -> type:
                 return self._browse(query.get("path", [roots[0]])[0])
             if route == "/api/accel":
                 return self._accel(query.get("path", [""])[0])
+            if route == "/api/overlays":
+                return self._overlays(query.get("path", [""])[0])
             if route == "/api/video":
                 return self._video(query.get("path", [""])[0])
             self.send_error(404)
@@ -149,6 +152,25 @@ def make_handler(roots: list[str]) -> type:
                 "cot": cori.t, "cow": comp(cori, 0), "cox": comp(cori, 1), "coy": comp(cori, 2), "coz": comp(cori, 3),
                 "warnings": accel.warnings + gyro.warnings + grav.warnings + cori.warnings,
                 "fps": probe_fps(safe),
+            })
+
+        def _overlays(self, path):
+            safe = self._safe(path)
+            if safe is None or not os.path.isfile(safe):
+                return self._json({"error": "path not allowed"}, 403)
+            empty = {"scene": {"t": [], "code": [], "prob": []},
+                     "faces": {"t": [], "items": []}}
+            index = find_gpmf_stream_index(safe)
+            if index is None:
+                return self._json(empty)
+            blob = extract_gpmf_blob(safe)
+            times = gpmd_packet_times(safe, index)
+            dur = probe_duration(safe)
+            sc = parse_scene(blob, times, dur)
+            fc = parse_faces(blob, times, dur)
+            return self._json({
+                "scene": {"t": sc.t, "code": sc.code, "prob": sc.prob},
+                "faces": {"t": fc.t, "items": fc.faces},
             })
 
         def _video(self, path):
