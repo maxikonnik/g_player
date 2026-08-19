@@ -7,6 +7,8 @@ const videomsg = document.getElementById("videomsg");
 
 let data = null;      // {t, ax, ay, az, amag, warnings, fps}
 let curPath = null;
+let overlays = null;
+let ovEnabled = true;
 let viewStart = 0, viewEnd = 1;   // visible time window (seconds)
 let userZoomed = false;
 const COL = { x: "#378ADD", y: "#1D9E75", z: "#D85A30", w: "#7F77DD", mag: "#26215c" };
@@ -90,6 +92,60 @@ function updatePanbar() {
   panthumb.style.left = (viewStart / D * 100) + "%";
   panthumb.style.width = Math.max(2, (viewEnd - viewStart) / D * 100) + "%";
 }
+
+const overlayCanvas = document.getElementById("overlay");
+const octx = overlayCanvas.getContext("2d");
+const stage = document.getElementById("stage");
+const SCENE_RU = { SNOW: "снег", URBA: "город", INDO: "помещение", WATR: "вода", VEGE: "зелень", BEAC: "пляж" };
+const OV_COLOR = "#39FF14";
+
+function _nearest(tArr, t) {
+  if (!tArr || !tArr.length) return -1;
+  let i = lowerBound(tArr, t);
+  if (i >= tArr.length) i = tArr.length - 1;
+  if (i > 0 && (t - tArr[i - 1]) < (tArr[i] - t)) i -= 1;
+  return i;
+}
+
+function _ovLabel(text, x, y) {
+  octx.font = "10px Calibri, sans-serif";
+  octx.lineWidth = 3; octx.strokeStyle = "#000"; octx.strokeText(text, x, y);
+  octx.fillStyle = OV_COLOR; octx.fillText(text, x, y);
+}
+
+function drawOverlay() {
+  const vr = video.getBoundingClientRect(), sr = stage.getBoundingClientRect();
+  overlayCanvas.style.left = (vr.left - sr.left) + "px";
+  overlayCanvas.style.top = (vr.top - sr.top) + "px";
+  overlayCanvas.style.width = vr.width + "px";
+  overlayCanvas.style.height = vr.height + "px";
+  const W = overlayCanvas.width = Math.max(1, Math.round(vr.width));
+  const H = overlayCanvas.height = Math.max(1, Math.round(vr.height));
+  octx.clearRect(0, 0, W, H);
+  if (!ovEnabled || !overlays || !video.videoWidth) return;
+  const scale = Math.min(W / video.videoWidth, H / video.videoHeight);
+  const dW = video.videoWidth * scale, dH = video.videoHeight * scale;
+  const oX = (W - dW) / 2, oY = (H - dH) / 2;
+  const t = video.currentTime || 0;
+  octx.textBaseline = "top";
+  const sc = overlays.scene;
+  const si = _nearest(sc && sc.t, t);
+  if (si >= 0 && sc.code[si]) {
+    _ovLabel((SCENE_RU[sc.code[si]] || sc.code[si]) + " " + sc.prob[si].toFixed(2), oX + 6, oY + 6);
+  }
+  const fc = overlays.faces;
+  const fi = _nearest(fc && fc.t, t);
+  if (fi >= 0 && fc.items[fi]) {
+    octx.lineWidth = 2; octx.strokeStyle = OV_COLOR;
+    for (const f of fc.items[fi]) {
+      const x = oX + f.x * dW, y = oY + f.y * dH, w = f.w * dW, h = f.h * dH;
+      octx.strokeRect(x, y, w, h);
+      _ovLabel(`улыбка ${f.smile} · моргание ${f.blink}`, x, Math.max(oY, y - 12));
+    }
+  }
+}
+
+document.getElementById("ovtoggle").addEventListener("change", (e) => { ovEnabled = e.target.checked; });
 
 function drawGraph(cnv, cx, tArr, seriesDef, unit) {
   const w = cnv.width = cnv.clientWidth * 2;
@@ -186,6 +242,7 @@ function loop() {
   }
   tlabel.textContent = label;
   draw();
+  drawOverlay();
   requestAnimationFrame(loop);
 }
 
@@ -313,6 +370,10 @@ async function openFile(path) {
     if (body.error) { warnings.textContent = body.error; data = null; return; }
     data = body;
     resetView();
+    fetch(`/api/overlays?path=${encodeURIComponent(path)}`)
+      .then((r) => r.json())
+      .then((o) => { overlays = o && !o.error ? o : null; })
+      .catch(() => { overlays = null; });
     warnings.textContent = (body.warnings || []).join(" · ");
   } catch (err) {
     warnings.textContent = String(err);
