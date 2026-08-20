@@ -98,6 +98,49 @@ const octx = overlayCanvas.getContext("2d");
 const stage = document.getElementById("stage");
 const SCENE_RU = { SNOW: "снег", URBA: "город", INDO: "помещение", WATR: "вода", VEGE: "зелень", BEAC: "пляж" };
 const OV_COLOR = "#39FF14";
+// GoPro FACE telemetry is noisy (spurious high-conf boxes, jitter, and a
+// projection that only aligns near frame centre). Soften it: keep the
+// most confident/largest faces and smooth their boxes over time.
+const FACE_CONF_MIN = 80;   // drop low-confidence detections
+const FACE_MAX = 3;         // at most this many boxes (largest first)
+const SCENE_PROB_MIN = 0.3; // hide the scene label below this probability
+const FACE_SMOOTH = 0.3;    // EMA factor toward the new box each frame
+const FACE_MATCH = 0.12;    // max normalised distance to treat as the same face
+let smoothedFaces = [];
+
+function selectFaces(fc, t) {
+  const i = _nearest(fc && fc.t, t);
+  if (i < 0 || !fc.items[i]) return [];
+  return fc.items[i]
+    .filter((f) => f.conf >= FACE_CONF_MIN)
+    .map((f) => ({ x: f.x, y: f.y, w: f.w, h: f.h, smile: f.smile, blink: f.blink, a: f.w * f.h }))
+    .sort((p, q) => q.a - p.a)
+    .slice(0, FACE_MAX);
+}
+
+function smoothFaces(target) {
+  const next = [], used = new Set();
+  for (const tf of target) {
+    let bi = -1, bd = FACE_MATCH * FACE_MATCH;
+    for (let i = 0; i < smoothedFaces.length; i++) {
+      if (used.has(i)) continue;
+      const s = smoothedFaces[i];
+      const d = (s.x - tf.x) ** 2 + (s.y - tf.y) ** 2;
+      if (d < bd) { bd = d; bi = i; }
+    }
+    if (bi >= 0) {
+      used.add(bi);
+      const s = smoothedFaces[bi], a = FACE_SMOOTH;
+      next.push({ x: s.x + (tf.x - s.x) * a, y: s.y + (tf.y - s.y) * a,
+                  w: s.w + (tf.w - s.w) * a, h: s.h + (tf.h - s.h) * a,
+                  smile: tf.smile, blink: tf.blink });
+    } else {
+      next.push({ x: tf.x, y: tf.y, w: tf.w, h: tf.h, smile: tf.smile, blink: tf.blink });
+    }
+  }
+  smoothedFaces = next;
+  return next;
+}
 
 function _nearest(tArr, t) {
   if (!tArr || !tArr.length) return -1;
@@ -130,20 +173,16 @@ function drawOverlay() {
   octx.textBaseline = "top";
   const sc = overlays.scene;
   const si = _nearest(sc && sc.t, t);
-  if (si >= 0 && sc.code[si]) {
+  if (si >= 0 && sc.code[si] && sc.prob[si] >= SCENE_PROB_MIN) {
     _ovLabel((SCENE_RU[sc.code[si]] || sc.code[si]) + " " + sc.prob[si].toFixed(2), oX + 6, oY + 6);
   }
-  const fc = overlays.faces;
-  const fi = _nearest(fc && fc.t, t);
-  if (fi >= 0 && fc.items[fi]) {
-    octx.lineWidth = 2; octx.strokeStyle = OV_COLOR;
-    for (const f of fc.items[fi]) {
-      // GoPro FACE x,y is the box CENTRE (not the top-left corner)
-      const w = f.w * dW, h = f.h * dH;
-      const x = oX + f.x * dW - w / 2, y = oY + f.y * dH - h / 2;
-      octx.strokeRect(x, y, w, h);
-      _ovLabel(`улыбка ${f.smile} · моргание ${f.blink}`, x, Math.max(oY, y - 12));
-    }
+  octx.lineWidth = 2; octx.strokeStyle = OV_COLOR;
+  for (const f of smoothFaces(selectFaces(overlays.faces, t))) {
+    // GoPro FACE x,y is the box CENTRE (not the top-left corner)
+    const w = f.w * dW, h = f.h * dH;
+    const x = oX + f.x * dW - w / 2, y = oY + f.y * dH - h / 2;
+    octx.strokeRect(x, y, w, h);
+    _ovLabel(`улыбка ${f.smile} · моргание ${f.blink}`, x, Math.max(oY, y - 12));
   }
 }
 
