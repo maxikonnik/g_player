@@ -138,7 +138,9 @@ function drawOverlay() {
   if (fi >= 0 && fc.items[fi]) {
     octx.lineWidth = 2; octx.strokeStyle = OV_COLOR;
     for (const f of fc.items[fi]) {
-      const x = oX + f.x * dW, y = oY + f.y * dH, w = f.w * dW, h = f.h * dH;
+      // GoPro FACE x,y is the box CENTRE (not the top-left corner)
+      const w = f.w * dW, h = f.h * dH;
+      const x = oX + f.x * dW - w / 2, y = oY + f.y * dH - h / 2;
       octx.strokeRect(x, y, w, h);
       _ovLabel(`улыбка ${f.smile} · моргание ${f.blink}`, x, Math.max(oY, y - 12));
     }
